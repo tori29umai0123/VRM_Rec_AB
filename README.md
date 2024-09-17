@@ -15,7 +15,8 @@ VRM_Rec_ABは、Controlnet学習用データセット作成アプリです。
 
 テスト用のVRMファイルは以下のリンクからダウンロードできます：
 
-- [テスト用VRMファイル](https://drive.google.com/file/d/1b_GtytwMdASTpzZjibxrLCLHiZgikRmu/view?usp=sharing)
+- [テスト用VRMファイル_女性キャラ](https://drive.google.com/file/d/13gLgJTSCQnRJZHN32UsVfVLzfF_I12IY/view?usp=sharing)
+- [テスト用VRMファイル_男性キャラ](https://drive.google.com/file/d/1jL7p94ZhlegOfNeJq_T80E_-eg48YuSP/view?usp=sharing)
 
 ## 使い方
 
@@ -79,7 +80,7 @@ VRM_Rec_ABは、Controlnet学習用データセット作成アプリです。
 
 3. VRMDirA, VRMDirB
    - VRMファイルが格納されているディレクトリのパスです。
-   - AとBで異なるモデルセットを使用できます。
+   - AとBで異なるモデルセットを使用できます。同じ体形のモデルセットの組み合わせで学習するのが望ましいです。
 
 4. NeckBoneName, UpperChestBoneName
    - カメラのフォーカス対象となるボーンの名前です。
