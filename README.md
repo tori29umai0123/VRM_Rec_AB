@@ -8,8 +8,8 @@ VRM_Rec_ABは、Controlnet学習用データセット作成アプリです。
 
 ビルド済みのアプリケーションは以下のリンクからダウンロードできます：
 
-- [Windows版](https://github.com/tori29umai0123/VRM_Rec_AB/releases/download/VRM_Rec_AB_V1/VRM_Rec_AB_win.zip)
-- [Linux版](https://github.com/tori29umai0123/VRM_Rec_AB/releases/download/VRM_Rec_AB_V1/VRM_Rec_AB_linux.zip)
+- [Windows版](https://github.com/tori29umai0123/VRM_Rec_AB/releases/download/VRM_Rec_AB_V2/VRM_Rec_AB_win.zip)
+- [Linux版](https://github.com/tori29umai0123/VRM_Rec_AB/releases/download/VRM_Rec_AB_V2/VRM_Rec_AB_linux.zip)
 
 ### VRMファイル
 
