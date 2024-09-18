@@ -3,11 +3,13 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
+#if UNITY_EDITOR
 using UnityEditor;
+#endif
 using UnityEngine;
 using UniVRM10;
 using Random = UnityEngine.Random;
+using System.Threading.Tasks;
 
 public class VRMPhotoshoot : MonoBehaviour
 {
@@ -15,6 +17,7 @@ public class VRMPhotoshoot : MonoBehaviour
     public GameObject VRM_B;
     public Camera shootingCamera;
     public RuntimeAnimatorController baseAnimatorController;
+
     private string NeckBoneName = "J_Bip_C_Neck";
     private string UpperChestBoneName = "J_Bip_C_UpperChest";
     private float radius_upperbody_min = 3f;
@@ -27,6 +30,7 @@ public class VRMPhotoshoot : MonoBehaviour
     private bool overwriteExistingFiles = false;
     private bool disableSilhouetteMode = true;
     private bool VRMBrandomMode = true;
+
     private Animator animatorA;
     private Animator animatorB;
     private List<AnimationClip> animationClips = new List<AnimationClip>();
@@ -47,21 +51,22 @@ public class VRMPhotoshoot : MonoBehaviour
 
     private string[] blendShapeNames = new string[]
     {
-        "Fcl_ALL_Neutral",
-        "Fcl_ALL_Angry",
-        "Fcl_ALL_Fun",
-        "Fcl_ALL_Joy",
-        "Fcl_ALL_Sorrow",
-        "Fcl_ALL_Surprised"
+        "happy",
+        "angry",
+        "sad",
+        "relaxed",
+        "surprised",
+        "neutral"
     };
 
     private List<GameObject> _vrmBObjects = new List<GameObject>();
-
+    private string currentBlendShapeName;
+    private float currentBlendShapeValue;
     private async void Start()
     {
         if (shootingCamera == null)
         {
-            Debug.LogError("Camera is not set. Please set them in the inspector.");
+            Debug.LogError("Camera is not set. Please set it in the inspector.");
             return;
         }
 
@@ -95,6 +100,7 @@ public class VRMPhotoshoot : MonoBehaviour
 
         var vrmAFiles = Directory.GetFiles(Path.Combine(modelbasePath, vrmDirNameA), "*.vrm").ToList();
         var vrmBFiles = Directory.GetFiles(Path.Combine(modelbasePath, vrmDirNameB), "*.vrm").ToList();
+
         await ProcessVRMFiles(vrmAFiles, vrmBFiles);
     }
 
@@ -196,6 +202,11 @@ public class VRMPhotoshoot : MonoBehaviour
 
     async Task ProcessVRMFiles(List<string> vrmAFiles, List<string> vrmBFiles)
     {
+        // 既存の写真ファイル名を取得
+        HashSet<string> existingPhotosA = overwriteExistingFiles ? new HashSet<string>() : GetExistingPhotoNumbers(output_A);
+        HashSet<string> existingPhotosB = overwriteExistingFiles ? new HashSet<string>() : GetExistingPhotoNumbers(output_B);
+
+        // VRM_Bモデルの読み込み
         foreach (var vrmB in vrmBFiles)
         {
             var loadVrm = await LoadVRM(vrmB);
@@ -207,6 +218,90 @@ public class VRMPhotoshoot : MonoBehaviour
         var photoNumber = startPhotoNumber;
         foreach (var vrmFile in vrmAFiles)
         {
+            HashSet<int> photosToTakeForThisModel = new HashSet<int>();
+            for (int i = photoNumber; i < photoNumber + shots; i++)
+            {
+                bool allPhotosExist = true;  // 全ての写真が存在するかを確認
+
+                // VRMBrandomMode の場合はサフィックスなし、false の場合はサフィックスありで写真をチェック
+                if (VRMBrandomMode)
+                {
+                    // 連番だけをチェック
+                    string photoFileNameA = $"{i:D6}.webp";
+                    string photoFileNameB = $"{i:D6}.webp";
+
+                    bool photoExistsA = existingPhotosA.Contains(photoFileNameA);
+                    bool photoExistsB = existingPhotosB.Contains(photoFileNameB);
+
+                    // どちらかの写真が存在しない場合
+                    if (!photoExistsA || !photoExistsB)
+                    {
+                        allPhotosExist = false;
+
+                        // 既存の写真を削除
+                        if (photoExistsA)
+                        {
+                            string fullPathA = Path.Combine(output_A, photoFileNameA);
+                            File.Delete(fullPathA);
+                            existingPhotosA.Remove(photoFileNameA);
+                        }
+                        if (photoExistsB)
+                        {
+                            string fullPathB = Path.Combine(output_B, photoFileNameB);
+                            File.Delete(fullPathB);
+                            existingPhotosB.Remove(photoFileNameB);
+                        }
+                    }
+                }
+                else
+                {
+                    // サフィックス付きのファイルをチェック (_01, _02, _03, ...)
+                    for (int j = 1; j <= _vrmBObjects.Count; j++)
+                    {
+                        string photoFileNameA = $"{i:D6}_{j:D2}.webp";
+                        string photoFileNameB = $"{i:D6}_{j:D2}.webp";
+
+                        bool photoExistsA = existingPhotosA.Contains(photoFileNameA);
+                        bool photoExistsB = existingPhotosB.Contains(photoFileNameB);
+
+                        // どちらかの写真が存在しない場合
+                        if (!photoExistsA || !photoExistsB)
+                        {
+                            allPhotosExist = false;
+
+                            // 既存の写真を削除
+                            if (photoExistsA)
+                            {
+                                string fullPathA = Path.Combine(output_A, photoFileNameA);
+                                File.Delete(fullPathA);
+                                existingPhotosA.Remove(photoFileNameA);
+                            }
+                            if (photoExistsB)
+                            {
+                                string fullPathB = Path.Combine(output_B, photoFileNameB);
+                                File.Delete(fullPathB);
+                                existingPhotosB.Remove(photoFileNameB);
+                            }
+                        }
+                    }
+                }
+
+                // どちらかの写真が存在しない場合、撮影リストに追加
+                if (!allPhotosExist)
+                {
+                    photosToTakeForThisModel.Add(i);
+                }
+            }
+
+            // 撮影する写真がすでに全て存在する場合はスキップ
+            if (photosToTakeForThisModel.Count == 0)
+            {
+                Debug.Log($"モデル {vrmFile} の全ての写真が既に存在します。処理をスキップします。");
+                photoNumber += shots;
+                continue;
+            }
+
+            // VRM_Aの読み込み
             VRM_A = await LoadVRM(vrmFile);
             VRM_A.SetActive(true);
 
@@ -234,11 +329,13 @@ public class VRMPhotoshoot : MonoBehaviour
 
             if (VRMBrandomMode)
             {
-                await StartPhotoshoot(vrmBObjects, photoNumber);
+                // ランダムモードでの撮影処理
+                await StartPhotoshoot(vrmBObjects, photosToTakeForThisModel);
             }
             else
             {
-                await StartPhotoshootAllVRMB(vrmBObjects, photoNumber);
+                // 全てのVRM_Bに対して写真撮影を実行
+                await StartPhotoshootAllVRMB(vrmBObjects, photosToTakeForThisModel);
             }
 
             photoNumber += shots;
@@ -323,60 +420,33 @@ public class VRMPhotoshoot : MonoBehaviour
         }
     }
 
-    private async Task StartPhotoshoot(List<GameObject> vrmBObjects, int startPhotoNumber)
+    private async Task StartPhotoshoot(List<GameObject> vrmBObjects, HashSet<int> photosToTake)
     {
-        HashSet<int> existingPhotosA = overwriteExistingFiles ? new HashSet<int>() : GetExistingPhotoNumbers(output_A);
-        HashSet<int> existingPhotosB = overwriteExistingFiles ? new HashSet<int>() : GetExistingPhotoNumbers(output_B);
-        HashSet<int> photosToTake = new HashSet<int>();
-
-        for (int i = startPhotoNumber; i < startPhotoNumber + shots; i++)
-        {
-            if (overwriteExistingFiles || (!existingPhotosA.Contains(i) && !existingPhotosB.Contains(i)))
-            {
-                photosToTake.Add(i);
-            }
-        }
-
         foreach (int photoNumber in photosToTake)
         {
             await TakeSinglePhoto(photoNumber, vrmBObjects);
         }
     }
 
-    private async Task StartPhotoshootAllVRMB(List<GameObject> vrmBObjects, int startPhotoNumber)
+    private async Task StartPhotoshootAllVRMB(List<GameObject> vrmBObjects, HashSet<int> photosToTake)
     {
-        HashSet<int> existingPhotosA = overwriteExistingFiles ? new HashSet<int>() : GetExistingPhotoNumbers(output_A);
-        HashSet<int> existingPhotosB = overwriteExistingFiles ? new HashSet<int>() : GetExistingPhotoNumbers(output_B);
-        HashSet<int> photosToTake = new HashSet<int>();
-
-        for (int i = startPhotoNumber; i < startPhotoNumber + shots; i++)
-        {
-            if (overwriteExistingFiles || (!existingPhotosA.Contains(i) && !existingPhotosB.Contains(i)))
-            {
-                photosToTake.Add(i);
-            }
-        }
-
         foreach (int photoNumber in photosToTake)
         {
             await TakeSinglePhotoAllVRMB(photoNumber, vrmBObjects);
         }
     }
 
-    HashSet<int> GetExistingPhotoNumbers(string directory)
+    HashSet<string> GetExistingPhotoNumbers(string directory)
     {
-        HashSet<int> existingNumbers = new HashSet<int>();
+        HashSet<string> existingNumbers = new HashSet<string>();
 
         if (Directory.Exists(directory))
         {
             string[] files = Directory.GetFiles(directory, "*.webp");
             foreach (string file in files)
             {
-                string fileName = Path.GetFileNameWithoutExtension(file);
-                if (int.TryParse(fileName, out int number))
-                {
-                    existingNumbers.Add(number);
-                }
+                string fileName = Path.GetFileName(file);
+                existingNumbers.Add(fileName);
             }
         }
 
@@ -418,7 +488,7 @@ public class VRMPhotoshoot : MonoBehaviour
 
             if (!photoATaken)
             {
-                photoATaken = await TakePhotoWithRetry(VRM_A, output_A, photoNumber.ToString());
+                photoATaken = await TakePhotoWithRetry(VRM_A, output_A, photoNumber.ToString("D6"));
             }
 
             if (photoATaken && !photoBTaken)
@@ -431,12 +501,19 @@ public class VRMPhotoshoot : MonoBehaviour
                 await Task.Delay(100);
 
                 await ApplyPoseToVRM_B();
+
+                // ブレンドシェイプを適用
+                if (currentBlendShapeName != null)
+                {
+                    ApplyRandomBlendShape(VRM_B, currentBlendShapeName, currentBlendShapeValue, false);
+                }
+
                 AdjustVRM_BToCamera(cameraSetup.targetFocus);
 
                 await Task.Yield();
                 await Task.Delay(100);
 
-                photoBTaken = await TakePhotoWithRetry(VRM_B, output_B, photoNumber.ToString());
+                photoBTaken = await TakePhotoWithRetry(VRM_B, output_B, photoNumber.ToString("D6"));
 
                 VRM_B.SetActive(false);
                 await Task.Yield();
@@ -448,7 +525,10 @@ public class VRMPhotoshoot : MonoBehaviour
                 {
                     string fileName = $"{photoNumber:D6}.webp";
                     string filePath = Path.Combine(output_A, fileName);
-                    File.Delete(filePath);
+                    if (File.Exists(filePath))
+                    {
+                        File.Delete(filePath);
+                    }
                 }
             }
 
@@ -491,7 +571,7 @@ public class VRMPhotoshoot : MonoBehaviour
         await Task.Delay((int)(waitTime * 1000));
 
         string originalPhotoNumber = photoNumber.ToString("D6");
-        
+
         // VRM_Aの写真をメモリ上に保持
         Texture2D vrmAScreenshot = await CaptureScreenshot(VRM_A);
 
@@ -510,7 +590,7 @@ public class VRMPhotoshoot : MonoBehaviour
                     Debug.LogWarning($"VRM_B at index {i} is null. Skipping this model.");
                     continue;
                 }
-                
+
                 animatorB = VRM_B.GetComponent<Animator>();
 
                 VRM_B.SetActive(true);
@@ -518,6 +598,13 @@ public class VRMPhotoshoot : MonoBehaviour
                 await Task.Delay(100);
 
                 await ApplyPoseToVRM_B();
+
+                // ブレンドシェイプを適用
+                if (currentBlendShapeName != null)
+                {
+                    ApplyRandomBlendShape(VRM_B, currentBlendShapeName, currentBlendShapeValue, false);
+                }
+
                 AdjustVRM_BToCamera(cameraSetup.targetFocus);
 
                 await Task.Yield();
@@ -627,12 +714,13 @@ public class VRMPhotoshoot : MonoBehaviour
 
                 if (blendShapeNames.Length > 0)
                 {
-                    var selectedBlendShape = blendShapeNames[Random.Range(0, blendShapeNames.Length)];
-                    ApplyRandomBlendShape(VRM_A, selectedBlendShape, true);
-                    // VRM_Bがnullでない場合のみ適用
+                    currentBlendShapeName = blendShapeNames[Random.Range(0, blendShapeNames.Length)];
+                    currentBlendShapeValue = Random.Range(0.5f, 1f);
+
+                    ApplyRandomBlendShape(VRM_A, currentBlendShapeName, currentBlendShapeValue, true);
                     if (VRM_B != null)
                     {
-                        ApplyRandomBlendShape(VRM_B, selectedBlendShape, false);
+                        ApplyRandomBlendShape(VRM_B, currentBlendShapeName, currentBlendShapeValue, false);
                     }
                 }
 
@@ -725,7 +813,7 @@ public class VRMPhotoshoot : MonoBehaviour
         float randomRadius = Random.Range(minRadius, maxRadius);
         Vector3 cameraPosition = targetFocus.position + randomDirection * randomRadius;
         Quaternion cameraRotation = Quaternion.LookRotation(targetFocus.position - cameraPosition);
-        
+
         shootingCamera.transform.position = cameraPosition;
         shootingCamera.transform.rotation = cameraRotation;
 
@@ -795,44 +883,42 @@ public class VRMPhotoshoot : MonoBehaviour
         return true;
     }
 
-    void ApplyRandomBlendShape(GameObject vrm, string selectedBlendShape, bool needWarn)
+    void ApplyRandomBlendShape(GameObject vrm, string selectedBlendShape, float value, bool needWarn)
     {
-        SkinnedMeshRenderer smr = vrm.GetComponentInChildren<SkinnedMeshRenderer>();
-        if (smr == null)
+        // Vrm10Instanceコンポーネントを取得
+        var vrmInstance = vrm.GetComponent<UniVRM10.Vrm10Instance>();
+        if (vrmInstance == null)
         {
             if (needWarn)
             {
-                Debug.LogError("SkinnedMeshRenderer not found on VRM");
+                Debug.LogError("Vrm10Instanceが見つかりません");
             }
             return;
         }
 
-        if (smr.sharedMesh.blendShapeCount == 0)
+        // 既存の表情をリセット
+        vrmInstance.Runtime.Expression.SetWeights(new Dictionary<UniVRM10.ExpressionKey, float>());
+
+        // ExpressionKeyを作成
+        UniVRM10.ExpressionKey expressionKey;
+
+        // selectedBlendShapeがExpressionPresetに存在するか確認
+        if (Enum.TryParse<UniVRM10.ExpressionPreset>(selectedBlendShape, true, out var preset))
         {
-            if (needWarn)
-            {
-                Debug.LogWarning("No blend shapes found on VRM. Skipping blend shape application.");
-            }
-            return;
+            // プリセット表情の場合
+            expressionKey = UniVRM10.ExpressionKey.CreateFromPreset(preset);
+        }
+        else
+        {
+            // カスタム表情の場合
+            expressionKey = UniVRM10.ExpressionKey.CreateCustom(selectedBlendShape);
         }
 
-        for (int i = 0; i < smr.sharedMesh.blendShapeCount; i++)
-        {
-            smr.SetBlendShapeWeight(i, 0);
-        }
-
-        float randomValue = Random.Range(0.5f, 1f);
-        int blendShapeIndex = smr.sharedMesh.GetBlendShapeIndex(selectedBlendShape);
-
-        if (blendShapeIndex != -1)
-        {
-            smr.SetBlendShapeWeight(blendShapeIndex, randomValue * 100);
-        }
-        else if (needWarn)
-        {
-            Debug.LogWarning($"Blend shape {selectedBlendShape} not found");
-        }
+        // 表情を適用
+        vrmInstance.Runtime.Expression.SetWeight(expressionKey, value);
     }
+
+
 
     void SetMaterialsToBlack(GameObject vrm)
     {
