@@ -15,29 +15,28 @@ public class VRMPhotoshoot : MonoBehaviour
     public GameObject VRM_B;
     public Camera shootingCamera;
     public RuntimeAnimatorController baseAnimatorController;
-    private  string NeckBoneName = "J_Bip_C_Neck";
-    private  string UpperChestBoneName = "J_Bip_C_UpperChest";
-    private  float radius_upperbody_min = 3f;
-    private  float radius_upperbody_max = 5f;
-    private  float radius_body_min = 10f;
-    private  float radius_body_max = 12f;
-    private  int shots = 10;
-    private  int startPhotoNumber = 1;
-    private  float waitTime = 0f;
+    private string NeckBoneName = "J_Bip_C_Neck";
+    private string UpperChestBoneName = "J_Bip_C_UpperChest";
+    private float radius_upperbody_min = 3f;
+    private float radius_upperbody_max = 5f;
+    private float radius_body_min = 10f;
+    private float radius_body_max = 12f;
+    private int shots = 10;
+    private int startPhotoNumber = 1;
+    private float waitTime = 0f;
     private bool overwriteExistingFiles = false;
     private bool disableSilhouetteMode = true;
+    private bool VRMBrandomMode = true;
     private Animator animatorA;
     private Animator animatorB;
     private List<AnimationClip> animationClips = new List<AnimationClip>();
     private string currentPoseName;
     private Transform focusTarget_upperbody;
     private Transform focusTarget_body;
-    private string VRMDirA = "E:/AI/kari/model";
-    private string VRMDirB = "E:/AI/kari/sotai";
-
-    private string output_A = "photos_A";
-    private string output_B = "photos_B";
-
+    private string VRMDirA = "E:/AI/VRM/model";
+    private string VRMDirB = "E:/AI/VRM/sotai";
+    private string output_A = "E:/AI/VRM/output_A";
+    private string output_B = "E:/AI/VRM/output_B";
     private const int MAX_CAMERA_POSITION_ATTEMPTS = 10;
 
 #if UNITY_EDITOR
@@ -45,7 +44,6 @@ public class VRMPhotoshoot : MonoBehaviour
 #else
     public static string basePath = System.IO.Path.GetDirectoryName(Application.dataPath);
 #endif
-
 
     private string[] blendShapeNames = new string[]
     {
@@ -87,19 +85,14 @@ public class VRMPhotoshoot : MonoBehaviour
         Directory.CreateDirectory(output_A);
         Directory.CreateDirectory(output_B);
 
-        // DirectoryInfoを使って親ディレクトリを取得
         DirectoryInfo dirAInfo = new DirectoryInfo(VRMDirA);
         DirectoryInfo dirBInfo = new DirectoryInfo(VRMDirB);
 
-        // modelbasePath は一つ上のディレクトリ
         string modelbasePath = dirAInfo.Parent.FullName;
 
-        // vrmDirNameA と vrmDirNameB は末端のディレクトリ名
         string vrmDirNameA = dirAInfo.Name;
         string vrmDirNameB = dirBInfo.Name;
 
-
-        // VRMファイルのリストを取得
         var vrmAFiles = Directory.GetFiles(Path.Combine(modelbasePath, vrmDirNameA), "*.vrm").ToList();
         var vrmBFiles = Directory.GetFiles(Path.Combine(modelbasePath, vrmDirNameB), "*.vrm").ToList();
         await ProcessVRMFiles(vrmAFiles, vrmBFiles);
@@ -175,6 +168,10 @@ public class VRMPhotoshoot : MonoBehaviour
                     if (bool.TryParse(value, out bool disableSilhouette))
                         disableSilhouetteMode = disableSilhouette;
                     break;
+                case "VRMBrandomMode":
+                    if (bool.TryParse(value, out bool VRMBrandom))
+                        VRMBrandomMode = VRMBrandom;
+                    break;
                 case "VRMDirA":
                     VRMDirA = value;
                     break;
@@ -210,13 +207,11 @@ public class VRMPhotoshoot : MonoBehaviour
         var photoNumber = startPhotoNumber;
         foreach (var vrmFile in vrmAFiles)
         {
-            // VRM_Aの読み込み
             VRM_A = await LoadVRM(vrmFile);
             VRM_A.SetActive(true);
 
             GameObject VRM_A_SILHOUETTE = null;
 
-            // シルエットモードが無効な場合のみシルエットを生成
             if (!disableSilhouetteMode)
             {
                 VRM_A_SILHOUETTE = Instantiate(VRM_A);
@@ -226,7 +221,6 @@ public class VRMPhotoshoot : MonoBehaviour
 
             var vrmBObjects = new List<GameObject>(_vrmBObjects);
 
-            // シルエットが生成されている場合にのみリストに追加
             if (VRM_A_SILHOUETTE != null)
             {
                 vrmBObjects.Add(VRM_A_SILHOUETTE);
@@ -238,12 +232,17 @@ public class VRMPhotoshoot : MonoBehaviour
             SetFocusTargets();
             SetMeshUpdateWhenOffscreenForGameObject(VRM_A);
 
-            // 写真撮影を開始
-            await StartPhotoshoot(vrmBObjects, photoNumber);
+            if (VRMBrandomMode)
+            {
+                await StartPhotoshoot(vrmBObjects, photoNumber);
+            }
+            else
+            {
+                await StartPhotoshootAllVRMB(vrmBObjects, photoNumber);
+            }
 
             photoNumber += shots;
 
-            // VRM_Aおよびシルエットの破棄
             Destroy(VRM_A);
             if (VRM_A_SILHOUETTE != null)
             {
@@ -260,7 +259,6 @@ public class VRMPhotoshoot : MonoBehaviour
         Application.Quit();
     #endif
     }
-
 
     async Task<GameObject> LoadVRM(string path)
     {
@@ -331,18 +329,37 @@ public class VRMPhotoshoot : MonoBehaviour
         HashSet<int> existingPhotosB = overwriteExistingFiles ? new HashSet<int>() : GetExistingPhotoNumbers(output_B);
         HashSet<int> photosToTake = new HashSet<int>();
 
-        // overwriteExistingFiles が true の場合は既存のファイルを無視して全て撮影する
         for (int i = startPhotoNumber; i < startPhotoNumber + shots; i++)
         {
             if (overwriteExistingFiles || (!existingPhotosA.Contains(i) && !existingPhotosB.Contains(i)))
             {
-                photosToTake.Add(i); // 上書きするか、新規ファイルの場合に撮影対象として追加
+                photosToTake.Add(i);
             }
         }
 
         foreach (int photoNumber in photosToTake)
         {
             await TakeSinglePhoto(photoNumber, vrmBObjects);
+        }
+    }
+
+    private async Task StartPhotoshootAllVRMB(List<GameObject> vrmBObjects, int startPhotoNumber)
+    {
+        HashSet<int> existingPhotosA = overwriteExistingFiles ? new HashSet<int>() : GetExistingPhotoNumbers(output_A);
+        HashSet<int> existingPhotosB = overwriteExistingFiles ? new HashSet<int>() : GetExistingPhotoNumbers(output_B);
+        HashSet<int> photosToTake = new HashSet<int>();
+
+        for (int i = startPhotoNumber; i < startPhotoNumber + shots; i++)
+        {
+            if (overwriteExistingFiles || (!existingPhotosA.Contains(i) && !existingPhotosB.Contains(i)))
+            {
+                photosToTake.Add(i);
+            }
+        }
+
+        foreach (int photoNumber in photosToTake)
+        {
+            await TakeSinglePhotoAllVRMB(photoNumber, vrmBObjects);
         }
     }
 
@@ -374,15 +391,13 @@ public class VRMPhotoshoot : MonoBehaviour
             return;
         }
 
-        // VRM_Bをランダムに選択
         VRM_B = vrmBObjects[Random.Range(0, vrmBObjects.Count)];
         animatorB = VRM_B.GetComponent<Animator>();
 
         await ApplyRandomPose();
 
-        // ポーズ適用後にフレームの更新を待つ
         await Task.Yield();
-        await Task.Delay(100); // 必要に応じて待機時間を調整
+        await Task.Delay(100);
 
         bool photoATaken = false;
         bool photoBTaken = false;
@@ -403,7 +418,7 @@ public class VRMPhotoshoot : MonoBehaviour
 
             if (!photoATaken)
             {
-                photoATaken = await TakePhotoWithRetry(VRM_A, output_A, photoNumber);
+                photoATaken = await TakePhotoWithRetry(VRM_A, output_A, photoNumber.ToString());
             }
 
             if (photoATaken && !photoBTaken)
@@ -413,16 +428,15 @@ public class VRMPhotoshoot : MonoBehaviour
 
                 VRM_B.SetActive(true);
                 await Task.Yield();
-                await Task.Delay(100); // モデル切り替えの待機時間を追加
+                await Task.Delay(100);
 
-                // VRM_Bのポーズを適用し、位置を調整する
                 await ApplyPoseToVRM_B();
                 AdjustVRM_BToCamera(cameraSetup.targetFocus);
 
                 await Task.Yield();
                 await Task.Delay(100);
 
-                photoBTaken = await TakePhotoWithRetry(VRM_B, output_B, photoNumber);
+                photoBTaken = await TakePhotoWithRetry(VRM_B, output_B, photoNumber.ToString());
 
                 VRM_B.SetActive(false);
                 await Task.Yield();
@@ -454,28 +468,135 @@ public class VRMPhotoshoot : MonoBehaviour
         VRM_B.SetActive(false);
     }
 
-    void AdjustVRM_BToCamera(Transform originalTargetFocus)
+    private async Task TakeSinglePhotoAllVRMB(int photoNumber, List<GameObject> vrmBObjects)
     {
-        Transform targetFocusB;
-        if (originalTargetFocus == focusTarget_upperbody)
+        if (!VRM_A.activeInHierarchy)
         {
-            targetFocusB = FindBoneByName(VRM_B.transform, NeckBoneName);
+            Debug.LogError("VRM_A is inactive. Stopping operation.");
+            return;
+        }
+
+        await ApplyRandomPose();
+
+        await Task.Yield();
+        await Task.Delay(100);
+
+        var cameraSetup = await TrySetCameraPositionAsync();
+        if (!cameraSetup.success)
+        {
+            Debug.LogError($"Failed to set camera position for photo {photoNumber}");
+            return;
+        }
+
+        await Task.Delay((int)(waitTime * 1000));
+
+        string originalPhotoNumber = photoNumber.ToString("D6");
+        
+        // VRM_Aの写真をメモリ上に保持
+        Texture2D vrmAScreenshot = await CaptureScreenshot(VRM_A);
+
+        if (vrmAScreenshot != null)
+        {
+            VRM_A.SetActive(false);
+            await Task.Yield();
+
+            bool allPhotosTaken = true;
+
+            for (int i = 0; i < vrmBObjects.Count; i++)
+            {
+                VRM_B = vrmBObjects[i];
+                if (VRM_B == null)
+                {
+                    Debug.LogWarning($"VRM_B at index {i} is null. Skipping this model.");
+                    continue;
+                }
+                
+                animatorB = VRM_B.GetComponent<Animator>();
+
+                VRM_B.SetActive(true);
+                await Task.Yield();
+                await Task.Delay(100);
+
+                await ApplyPoseToVRM_B();
+                AdjustVRM_BToCamera(cameraSetup.targetFocus);
+
+                await Task.Yield();
+                await Task.Delay(100);
+
+                string suffixedPhotoNumber = $"{originalPhotoNumber}_{(i + 1):D2}";
+                bool photoBTaken = await TakePhotoWithRetry(VRM_B, output_B, suffixedPhotoNumber);
+
+                if (photoBTaken)
+                {
+                    // VRM_Aの画像を保存（接尾辞付き）
+                    string filePathA = Path.Combine(output_A, $"{suffixedPhotoNumber}.webp");
+                    File.WriteAllBytes(filePathA, vrmAScreenshot.EncodeToPNG());
+                }
+                else
+                {
+                    allPhotosTaken = false;
+                    Debug.LogWarning($"Failed to take photo for VRM_B {suffixedPhotoNumber}");
+                }
+
+                VRM_B.SetActive(false);
+                await Task.Yield();
+            }
+
+            VRM_A.SetActive(true);
+            await Task.Yield();
+
+            // すべての写真が正常に撮影されなかった場合、全ての写真を削除
+            if (!allPhotosTaken)
+            {
+                for (int i = 0; i < vrmBObjects.Count; i++)
+                {
+                    string suffixedPhotoNumber = $"{originalPhotoNumber}_{(i + 1):D2}";
+                    string filePathA = Path.Combine(output_A, $"{suffixedPhotoNumber}.webp");
+                    if (File.Exists(filePathA))
+                    {
+                        File.Delete(filePathA);
+                    }
+                    string filePathB = Path.Combine(output_B, $"{suffixedPhotoNumber}.webp");
+                    if (File.Exists(filePathB))
+                    {
+                        File.Delete(filePathB);
+                    }
+                }
+                Debug.LogWarning($"Deleted all photos for {originalPhotoNumber} due to incomplete set");
+            }
+
+            // メモリ解放
+            Destroy(vrmAScreenshot);
         }
         else
         {
-            targetFocusB = FindBoneByName(VRM_B.transform, UpperChestBoneName);
+            Debug.LogError($"Failed to capture screenshot for VRM_A {photoNumber}");
         }
+    }
 
-        if (targetFocusB != null)
-        {
-            // カメラの位置と回転を保持したまま、VRM_Bの位置を調整
-            Vector3 offset = targetFocusB.position - originalTargetFocus.position;
-            VRM_B.transform.position -= offset;
+    private async Task<Texture2D> CaptureScreenshot(GameObject target)
+    {
+        target.SetActive(true);
+        await Task.Yield();
 
-            // VRM_Bの回転も調整して、カメラに対して同じ向きになるようにする
-            Quaternion rotationDiff = originalTargetFocus.rotation * Quaternion.Inverse(targetFocusB.rotation);
-            VRM_B.transform.rotation = rotationDiff * VRM_B.transform.rotation;
-        }
+        RenderTexture currentRT = RenderTexture.active;
+        RenderTexture.active = null;
+
+        RenderTexture renderTexture = new RenderTexture(1024, 1024, 24);
+        shootingCamera.targetTexture = renderTexture;
+        shootingCamera.Render();
+
+        RenderTexture.active = renderTexture;
+        Texture2D screenshot = new Texture2D(1024, 1024, TextureFormat.RGB24, false);
+        screenshot.ReadPixels(new Rect(0, 0, 1024, 1024), 0, 0);
+        screenshot.Apply();
+
+        RenderTexture.active = currentRT;
+        shootingCamera.targetTexture = null;
+
+        Destroy(renderTexture);
+
+        return screenshot;
     }
 
     async Task ApplyRandomPose()
@@ -500,7 +621,7 @@ public class VRMPhotoshoot : MonoBehaviour
                 animatorA.Update(0);
 
                 await Task.Yield();
-                await Task.Delay(100); // ポーズ適用の待機時間を増加
+                await Task.Delay(100);
 
                 animatorA.StopPlayback();
 
@@ -508,7 +629,11 @@ public class VRMPhotoshoot : MonoBehaviour
                 {
                     var selectedBlendShape = blendShapeNames[Random.Range(0, blendShapeNames.Length)];
                     ApplyRandomBlendShape(VRM_A, selectedBlendShape, true);
-                    ApplyRandomBlendShape(VRM_B, selectedBlendShape, false);
+                    // VRM_Bがnullでない場合のみ適用
+                    if (VRM_B != null)
+                    {
+                        ApplyRandomBlendShape(VRM_B, selectedBlendShape, false);
+                    }
                 }
 
                 await Task.Delay(100);
@@ -535,7 +660,7 @@ public class VRMPhotoshoot : MonoBehaviour
                 boneB.localRotation = boneA.localRotation;
             }
         }
-        await Task.Yield(); // ポーズ適用後にフレーム更新を待つ
+        await Task.Yield();
     }
 
     Transform FindCorrespondingBone(Animator targetAnimator, string boneName)
@@ -551,7 +676,7 @@ public class VRMPhotoshoot : MonoBehaviour
             var result = SetCameraPosition();
             if (result.success)
             {
-                await Task.Yield(); // カメラ位置設定後にフレーム更新を待つ
+                await Task.Yield();
                 if (IsSubjectInView())
                 {
                     return result;
@@ -606,6 +731,7 @@ public class VRMPhotoshoot : MonoBehaviour
 
         return (true, cameraPosition, cameraRotation, targetFocus);
     }
+
     bool IsSubjectInView()
     {
         Plane[] planes = GeometryUtility.CalculateFrustumPlanes(shootingCamera);
@@ -613,24 +739,22 @@ public class VRMPhotoshoot : MonoBehaviour
         return GeometryUtility.TestPlanesAABB(planes, bounds);
     }
 
-    async Task<bool> TakePhotoWithRetry(GameObject target, string directory, int photoNumber)
+    async Task<bool> TakePhotoWithRetry(GameObject target, string directory, string photoNumber)
     {
         await Task.Yield();
 
         bool photoTaken = false;
-        string fileName = $"{photoNumber:D6}.webp";
+        string fileName = $"{photoNumber}.webp";
         string filePath = Path.Combine(directory, fileName);
 
-        // 上書きしない場合にファイルが存在していたらスキップする
         if (File.Exists(filePath) && !overwriteExistingFiles)
         {
             Debug.Log($"File {filePath} already exists, skipping photo.");
-            return false; // 上書きしない場合はスキップ
+            return false;
         }
 
         try
         {
-            // ファイルが既に存在していても上書きする
             photoTaken = TakePhoto(target, directory, photoNumber);
         }
         catch (Exception e)
@@ -641,9 +765,9 @@ public class VRMPhotoshoot : MonoBehaviour
         return photoTaken;
     }
 
-    bool TakePhoto(GameObject target, string directory, int photoNumber)
+    bool TakePhoto(GameObject target, string directory, string photoNumber)
     {
-        string fileName = $"{photoNumber:D6}.webp";
+        string fileName = $"{photoNumber}.webp";
         string filePath = Path.Combine(directory, fileName);
 
         RenderTexture currentRT = RenderTexture.active;
@@ -750,17 +874,36 @@ public class VRMPhotoshoot : MonoBehaviour
             }
         }
 
-        // シルエットモデルのSpringBoneを無効化
         var vrmInstance = vrm.GetComponent<UniVRM10.Vrm10Instance>();
         if (vrmInstance != null && vrmInstance.SpringBone != null)
         {
-            // 各スプリングの更新を無効化
             foreach (var spring in vrmInstance.SpringBone.Springs)
             {
-                spring.Joints.Clear();  // スプリングのジョイントをクリアすることで動作を停止
+                spring.Joints.Clear();
             }
             Debug.Log("シルエットモデルのSpringBoneのジョイントがクリアされ、無効化されました。");
         }
     }
-}
 
+    void AdjustVRM_BToCamera(Transform originalTargetFocus)
+    {
+        Transform targetFocusB;
+        if (originalTargetFocus == focusTarget_upperbody)
+        {
+            targetFocusB = FindBoneByName(VRM_B.transform, NeckBoneName);
+        }
+        else
+        {
+            targetFocusB = FindBoneByName(VRM_B.transform, UpperChestBoneName);
+        }
+
+        if (targetFocusB != null)
+        {
+            Vector3 offset = targetFocusB.position - originalTargetFocus.position;
+            VRM_B.transform.position -= offset;
+
+            Quaternion rotationDiff = originalTargetFocus.rotation * Quaternion.Inverse(targetFocusB.rotation);
+            VRM_B.transform.rotation = rotationDiff * VRM_B.transform.rotation;
+        }
+    }
+}
