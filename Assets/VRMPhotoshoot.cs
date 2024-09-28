@@ -227,8 +227,8 @@ public class VRMPhotoshoot : MonoBehaviour
                 if (VRMBrandomMode)
                 {
                     // 連番だけをチェック
-                    string photoFileNameA = $"{i:D6}.webp";
-                    string photoFileNameB = $"{i:D6}.webp";
+                    string photoFileNameA = $"{i:D6}.png";
+                    string photoFileNameB = $"{i:D6}.png";
 
                     bool photoExistsA = existingPhotosA.Contains(photoFileNameA);
                     bool photoExistsB = existingPhotosB.Contains(photoFileNameB);
@@ -258,8 +258,8 @@ public class VRMPhotoshoot : MonoBehaviour
                     // サフィックス付きのファイルをチェック (_01, _02, _03, ...)
                     for (int j = 1; j <= _vrmBObjects.Count; j++)
                     {
-                        string photoFileNameA = $"{i:D6}_{j:D2}.webp";
-                        string photoFileNameB = $"{i:D6}_{j:D2}.webp";
+                        string photoFileNameA = $"{i:D6}_{j:D2}.png";
+                        string photoFileNameB = $"{i:D6}_{j:D2}.png";
 
                         bool photoExistsA = existingPhotosA.Contains(photoFileNameA);
                         bool photoExistsB = existingPhotosB.Contains(photoFileNameB);
@@ -442,7 +442,7 @@ public class VRMPhotoshoot : MonoBehaviour
 
         if (Directory.Exists(directory))
         {
-            string[] files = Directory.GetFiles(directory, "*.webp");
+            string[] files = Directory.GetFiles(directory, "*.png");
             foreach (string file in files)
             {
                 string fileName = Path.GetFileName(file);
@@ -523,7 +523,7 @@ public class VRMPhotoshoot : MonoBehaviour
 
                 if (!photoBTaken)
                 {
-                    string fileName = $"{photoNumber:D6}.webp";
+                    string fileName = $"{photoNumber:D6}.png";
                     string filePath = Path.Combine(output_A, fileName);
                     if (File.Exists(filePath))
                     {
@@ -616,7 +616,7 @@ public class VRMPhotoshoot : MonoBehaviour
                 if (photoBTaken)
                 {
                     // VRM_Aの画像を保存（接尾辞付き）
-                    string filePathA = Path.Combine(output_A, $"{suffixedPhotoNumber}.webp");
+                    string filePathA = Path.Combine(output_A, $"{suffixedPhotoNumber}.png");
                     File.WriteAllBytes(filePathA, vrmAScreenshot.EncodeToPNG());
                 }
                 else
@@ -638,12 +638,12 @@ public class VRMPhotoshoot : MonoBehaviour
                 for (int i = 0; i < vrmBObjects.Count; i++)
                 {
                     string suffixedPhotoNumber = $"{originalPhotoNumber}_{(i + 1):D2}";
-                    string filePathA = Path.Combine(output_A, $"{suffixedPhotoNumber}.webp");
+                    string filePathA = Path.Combine(output_A, $"{suffixedPhotoNumber}.png");
                     if (File.Exists(filePathA))
                     {
                         File.Delete(filePathA);
                     }
-                    string filePathB = Path.Combine(output_B, $"{suffixedPhotoNumber}.webp");
+                    string filePathB = Path.Combine(output_B, $"{suffixedPhotoNumber}.png");
                     if (File.Exists(filePathB))
                     {
                         File.Delete(filePathB);
@@ -832,7 +832,7 @@ public class VRMPhotoshoot : MonoBehaviour
         await Task.Yield();
 
         bool photoTaken = false;
-        string fileName = $"{photoNumber}.webp";
+        string fileName = $"{photoNumber}.png";
         string filePath = Path.Combine(directory, fileName);
 
         if (File.Exists(filePath) && !overwriteExistingFiles)
@@ -855,7 +855,7 @@ public class VRMPhotoshoot : MonoBehaviour
 
     bool TakePhoto(GameObject target, string directory, string photoNumber)
     {
-        string fileName = $"{photoNumber}.webp";
+        string fileName = $"{photoNumber}.png";
         string filePath = Path.Combine(directory, fileName);
 
         RenderTexture currentRT = RenderTexture.active;
