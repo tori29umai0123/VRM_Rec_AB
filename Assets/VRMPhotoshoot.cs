@@ -17,6 +17,10 @@ public class VRMPhotoshoot : MonoBehaviour
     public GameObject VRM_B;
     public Camera shootingCamera;
     public RuntimeAnimatorController baseAnimatorController;
+    
+    public Color backgroundColorA = Color.white;
+    public Color backgroundColorB = Color.black;
+
 
     private string NeckBoneName = "J_Bip_C_Neck";
     private string UpperChestBoneName = "J_Bip_C_UpperChest";
@@ -475,6 +479,9 @@ public class VRMPhotoshoot : MonoBehaviour
 
         while ((!photoATaken || !photoBTaken) && retryLimit-- > 0)
         {
+            // VRM_Aの背景色を設定
+            shootingCamera.backgroundColor = backgroundColorA;
+
             var cameraSetup = await TrySetCameraPositionAsync();
             if (!cameraSetup.success)
             {
@@ -499,6 +506,9 @@ public class VRMPhotoshoot : MonoBehaviour
                 VRM_B.SetActive(true);
                 await Task.Yield();
                 await Task.Delay(100);
+
+                // VRM_Bの背景色を設定
+                shootingCamera.backgroundColor = backgroundColorB;
 
                 await ApplyPoseToVRM_B();
 
