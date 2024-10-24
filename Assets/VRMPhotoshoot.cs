@@ -883,6 +883,22 @@ public class VRMPhotoshoot : MonoBehaviour
         return true;
     }
 
+    void ResetAllBlendShapes(UniVRM10.Vrm10Instance vrmInstance)
+    {
+        foreach (UniVRM10.ExpressionPreset preset in Enum.GetValues(typeof(UniVRM10.ExpressionPreset)))
+        {
+            if (preset.ToString() != "custom")
+            {
+                var presetKey = UniVRM10.ExpressionKey.CreateFromPreset(preset);
+                vrmInstance.Runtime.Expression.SetWeight(presetKey, 0f);
+            }
+            else
+            {
+                // TODO: カスタム表情のリセット
+            }
+        }
+    }
+
     void ApplyRandomBlendShape(GameObject vrm, string selectedBlendShape, float value, bool needWarn)
     {
         // Vrm10Instanceコンポーネントを取得
@@ -897,7 +913,7 @@ public class VRMPhotoshoot : MonoBehaviour
         }
 
         // 既存の表情をリセット
-        vrmInstance.Runtime.Expression.SetWeights(new Dictionary<UniVRM10.ExpressionKey, float>());
+        ResetAllBlendShapes(vrmInstance);
 
         // ExpressionKeyを作成
         UniVRM10.ExpressionKey expressionKey;
