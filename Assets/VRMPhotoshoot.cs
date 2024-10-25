@@ -18,9 +18,14 @@ public class VRMPhotoshoot : MonoBehaviour
     public Camera shootingCamera;
     public RuntimeAnimatorController baseAnimatorController;
     
+    // 背景色
     public Color backgroundColorA = Color.white;
     public Color backgroundColorB = Color.black;
 
+    // FOV調整用のフィールド
+    public bool adjustFieldOfView = false; // FOVを調整するかどうか
+    public float minHeightInMeters = 1.5f; // 画面に収める最小の高さ
+    public float maxHeightInMeters = 3.0f; // 画面に収める最大の高さ
 
     private string NeckBoneName = "J_Bip_C_Neck";
     private string UpperChestBoneName = "J_Bip_C_UpperChest";
@@ -482,6 +487,7 @@ public class VRMPhotoshoot : MonoBehaviour
             // VRM_Aの背景色を設定
             shootingCamera.backgroundColor = backgroundColorA;
 
+            // カメラ位置設定
             var cameraSetup = await TrySetCameraPositionAsync();
             if (!cameraSetup.success)
             {
@@ -491,6 +497,9 @@ public class VRMPhotoshoot : MonoBehaviour
                 continue;
             }
 
+            // カメラ距離に基づいてFOVを調整
+            AdjustFieldOfViewBasedOnDistance(Vector3.Distance(cameraSetup.cameraPosition, cameraSetup.targetFocus.position));
+
             await Task.Delay((int)(waitTime * 1000));
 
             if (!photoATaken)
@@ -498,6 +507,7 @@ public class VRMPhotoshoot : MonoBehaviour
                 photoATaken = await TakePhotoWithRetry(VRM_A, output_A, photoNumber.ToString("D6"));
             }
 
+            // VRM_Bの撮影
             if (photoATaken && !photoBTaken)
             {
                 VRM_A.SetActive(false);
@@ -1018,4 +1028,26 @@ public class VRMPhotoshoot : MonoBehaviour
             VRM_B.transform.rotation = rotationDiff * VRM_B.transform.rotation;
         }
     }
+}
+
+    float CalculateFOV(float height, float distance)
+    {
+        return 2.0f * Mathf.Atan(height / (2.0f * distance)) * Mathf.Rad2Deg;
+    }
+
+    private void AdjustFieldOfViewBasedOnDistance(float distance)
+    {
+        if (!adjustFieldOfView) return;
+
+        // 距離から最小FOVと最大FOVを計算
+        float minFOV = CalculateFOV(minHeightInMeters, distance);
+        float maxFOV = CalculateFOV(maxHeightInMeters, distance);
+
+        // FOVをランダムに選択（範囲を持たせる）
+        float randomFOV = Random.Range(minFOV, maxFOV);
+
+        // カメラのFOVを設定
+        shootingCamera.fieldOfView = randomFOV;
+    }
+
 }
