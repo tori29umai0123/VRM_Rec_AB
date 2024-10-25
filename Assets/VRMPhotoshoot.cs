@@ -18,9 +18,14 @@ public class VRMPhotoshoot : MonoBehaviour
     public Camera shootingCamera;
     public RuntimeAnimatorController baseAnimatorController;
     
+    // 背景色
     public Color backgroundColorA = Color.white;
     public Color backgroundColorB = Color.black;
 
+    // FOV調整用のフィールド
+    public bool adjustFieldOfView = false; // FOVを調整するかどうか
+    public float minHeightInMeters = 1.5f; // 画面に収める最小の高さ
+    public float maxHeightInMeters = 3.0f; // 画面に収める最大の高さ
 
     private string NeckBoneName = "J_Bip_C_Neck";
     private string UpperChestBoneName = "J_Bip_C_UpperChest";
