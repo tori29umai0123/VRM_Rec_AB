@@ -600,6 +600,9 @@ public class VRMPhotoshoot : MonoBehaviour
             return;
         }
 
+        // カメラ距離に基づいてFOVを調整
+        AdjustFieldOfViewBasedOnDistance(Vector3.Distance(cameraSetup.cameraPosition, cameraSetup.targetFocus.position));
+
         await Task.Delay((int)(waitTime * 1000));
 
         string originalPhotoNumber = photoNumber.ToString("D6");
