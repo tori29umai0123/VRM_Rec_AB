@@ -23,9 +23,9 @@ public class VRMPhotoshoot : MonoBehaviour
     public Color backgroundColorB = Color.black;
 
     // FOV調整用のフィールド
-    public bool adjustFieldOfView = false; // FOVを調整するかどうか
-    public float minHeightInMeters = 1.5f; // 画面に収める最小の高さ
-    public float maxHeightInMeters = 3.0f; // 画面に収める最大の高さ
+    private bool adjustFieldOfView = false; // FOVを調整するかどうか
+    private float minHeightInMeters = 1.9f; // 画面に収める最小の高さ
+    private float maxHeightInMeters = 3.0f; // 画面に収める最大の高さ
 
     private string NeckBoneName = "J_Bip_C_Neck";
     private string UpperChestBoneName = "J_Bip_C_UpperChest";
@@ -201,6 +201,18 @@ public class VRMPhotoshoot : MonoBehaviour
                     break;
                 case "blendShapeNames":
                     blendShapeNames = value.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries).Select(s => s.Trim()).ToArray();
+                    break;
+                case "adjustFieldOfView":
+                    if (bool.TryParse(value, out bool adjustFieldOfViewValue))
+                        adjustFieldOfView = adjustFieldOfViewValue;
+                    break;
+                case "minHeightInMeters":
+                    if (float.TryParse(value, out float minHeight))
+                        minHeightInMeters = minHeight;
+                    break;
+                case "maxHeightInMeters":
+                    if (float.TryParse(value, out float maxHeight))
+                        maxHeightInMeters = maxHeight;
                     break;
                 default:
                     Debug.LogWarning($"Unknown setting: {key}");
@@ -1028,7 +1040,7 @@ public class VRMPhotoshoot : MonoBehaviour
             VRM_B.transform.rotation = rotationDiff * VRM_B.transform.rotation;
         }
     }
-}
+
 
     float CalculateFOV(float height, float distance)
     {
