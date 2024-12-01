@@ -598,6 +598,9 @@ public class VRMPhotoshoot : MonoBehaviour
         await Task.Yield();
         await Task.Delay(100);
 
+        // VRM_Aの背景色を設定
+        shootingCamera.backgroundColor = backgroundColorA;
+
         var cameraSetup = await TrySetCameraPositionAsync();
         if (!cameraSetup.success)
         {
@@ -619,6 +622,9 @@ public class VRMPhotoshoot : MonoBehaviour
         {
             VRM_A.SetActive(false);
             await Task.Yield();
+
+            // VRM_Bの背景色を設定
+            shootingCamera.backgroundColor = backgroundColorB;
 
             bool allPhotosTaken = true;
 
