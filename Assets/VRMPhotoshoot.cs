@@ -17,6 +17,15 @@ public class VRMPhotoshoot : MonoBehaviour
     public GameObject VRM_B;
     public Camera shootingCamera;
     public RuntimeAnimatorController baseAnimatorController;
+    
+    // 背景色
+    public Color backgroundColorA = Color.white;
+    public Color backgroundColorB = Color.white;
+
+    // FOV調整用のフィールド
+    private bool adjustFieldOfView = false; // FOVを調整するかどうか
+    private float minHeightInMeters = 1.9f; // 画面に収める最小の高さ
+    private float maxHeightInMeters = 3.0f; // 画面に収める最大の高さ
 
     private string NeckBoneName = "J_Bip_C_Neck";
     private string UpperChestBoneName = "J_Bip_C_UpperChest";
@@ -25,6 +34,7 @@ public class VRMPhotoshoot : MonoBehaviour
     private float radius_body_min = 10f;
     private float radius_body_max = 12f;
     private int shots = 10;
+    private int resolution = 1024;
     private int startPhotoNumber = 1;
     private float waitTime = 0f;
     private bool overwriteExistingFiles = false;
@@ -158,6 +168,10 @@ public class VRMPhotoshoot : MonoBehaviour
                     if (int.TryParse(value, out int shotsValue))
                         shots = shotsValue;
                     break;
+                case "resolution":
+                    if (int.TryParse(value, out int res))
+                        resolution = res;
+                    break;
                 case "startPhotoNumber":
                     if (int.TryParse(value, out int startPhotoNum))
                         startPhotoNumber = startPhotoNum;
@@ -192,6 +206,18 @@ public class VRMPhotoshoot : MonoBehaviour
                     break;
                 case "blendShapeNames":
                     blendShapeNames = value.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries).Select(s => s.Trim()).ToArray();
+                    break;
+                case "adjustFieldOfView":
+                    if (bool.TryParse(value, out bool adjustFieldOfViewValue))
+                        adjustFieldOfView = adjustFieldOfViewValue;
+                    break;
+                case "minHeightInMeters":
+                    if (float.TryParse(value, out float minHeight))
+                        minHeightInMeters = minHeight;
+                    break;
+                case "maxHeightInMeters":
+                    if (float.TryParse(value, out float maxHeight))
+                        maxHeightInMeters = maxHeight;
                     break;
                 default:
                     Debug.LogWarning($"Unknown setting: {key}");
@@ -475,6 +501,10 @@ public class VRMPhotoshoot : MonoBehaviour
 
         while ((!photoATaken || !photoBTaken) && retryLimit-- > 0)
         {
+            // VRM_Aの背景色を設定
+            shootingCamera.backgroundColor = backgroundColorA;
+
+            // カメラ位置設定
             var cameraSetup = await TrySetCameraPositionAsync();
             if (!cameraSetup.success)
             {
@@ -484,6 +514,11 @@ public class VRMPhotoshoot : MonoBehaviour
                 continue;
             }
 
+            // カメラ距離に基づいてFOVを調整
+            if (adjustFieldOfView) {
+                AdjustFieldOfViewBasedOnDistance(Vector3.Distance(cameraSetup.cameraPosition, cameraSetup.targetFocus.position));
+            }
+
             await Task.Delay((int)(waitTime * 1000));
 
             if (!photoATaken)
@@ -491,6 +526,7 @@ public class VRMPhotoshoot : MonoBehaviour
                 photoATaken = await TakePhotoWithRetry(VRM_A, output_A, photoNumber.ToString("D6"));
             }
 
+            // VRM_Bの撮影
             if (photoATaken && !photoBTaken)
             {
                 VRM_A.SetActive(false);
@@ -499,6 +535,9 @@ public class VRMPhotoshoot : MonoBehaviour
                 VRM_B.SetActive(true);
                 await Task.Yield();
                 await Task.Delay(100);
+
+                // VRM_Bの背景色を設定
+                shootingCamera.backgroundColor = backgroundColorB;
 
                 await ApplyPoseToVRM_B();
 
@@ -561,11 +600,19 @@ public class VRMPhotoshoot : MonoBehaviour
         await Task.Yield();
         await Task.Delay(100);
 
+        // VRM_Aの背景色を設定
+        shootingCamera.backgroundColor = backgroundColorA;
+
         var cameraSetup = await TrySetCameraPositionAsync();
         if (!cameraSetup.success)
         {
             Debug.LogError($"Failed to set camera position for photo {photoNumber}");
             return;
+        }
+
+        // カメラ距離に基づいてFOVを調整
+        if (adjustFieldOfView) {
+            AdjustFieldOfViewBasedOnDistance(Vector3.Distance(cameraSetup.cameraPosition, cameraSetup.targetFocus.position));
         }
 
         await Task.Delay((int)(waitTime * 1000));
@@ -579,6 +626,9 @@ public class VRMPhotoshoot : MonoBehaviour
         {
             VRM_A.SetActive(false);
             await Task.Yield();
+
+            // VRM_Bの背景色を設定
+            shootingCamera.backgroundColor = backgroundColorB;
 
             bool allPhotosTaken = true;
 
@@ -669,13 +719,13 @@ public class VRMPhotoshoot : MonoBehaviour
         RenderTexture currentRT = RenderTexture.active;
         RenderTexture.active = null;
 
-        RenderTexture renderTexture = new RenderTexture(1024, 1024, 24);
+        RenderTexture renderTexture = new RenderTexture(resolution, resolution, 24);
         shootingCamera.targetTexture = renderTexture;
         shootingCamera.Render();
 
         RenderTexture.active = renderTexture;
-        Texture2D screenshot = new Texture2D(1024, 1024, TextureFormat.RGB24, false);
-        screenshot.ReadPixels(new Rect(0, 0, 1024, 1024), 0, 0);
+        Texture2D screenshot = new Texture2D(resolution, resolution, TextureFormat.RGB24, false);
+        screenshot.ReadPixels(new Rect(0, 0, resolution, resolution), 0, 0);
         screenshot.Apply();
 
         RenderTexture.active = currentRT;
@@ -861,13 +911,13 @@ public class VRMPhotoshoot : MonoBehaviour
         RenderTexture currentRT = RenderTexture.active;
         RenderTexture.active = null;
 
-        RenderTexture renderTexture = new RenderTexture(1024, 1024, 24);
+        RenderTexture renderTexture = new RenderTexture(resolution, resolution, 24);
         shootingCamera.targetTexture = renderTexture;
         shootingCamera.Render();
 
         RenderTexture.active = renderTexture;
-        Texture2D screenshot = new Texture2D(1024, 1024, TextureFormat.RGB24, false);
-        screenshot.ReadPixels(new Rect(0, 0, 1024, 1024), 0, 0);
+        Texture2D screenshot = new Texture2D(resolution, resolution, TextureFormat.RGB24, false);
+        screenshot.ReadPixels(new Rect(0, 0, resolution, resolution), 0, 0);
         screenshot.Apply();
 
         byte[] bytes = screenshot.EncodeToPNG();
@@ -1008,4 +1058,24 @@ public class VRMPhotoshoot : MonoBehaviour
             VRM_B.transform.rotation = rotationDiff * VRM_B.transform.rotation;
         }
     }
+
+
+    float CalculateFOV(float height, float distance)
+    {
+        return 2.0f * Mathf.Atan(height / (2.0f * distance)) * Mathf.Rad2Deg;
+    }
+
+    private void AdjustFieldOfViewBasedOnDistance(float distance)
+    {
+        // 距離から最小FOVと最大FOVを計算
+        float minFOV = CalculateFOV(minHeightInMeters, distance);
+        float maxFOV = CalculateFOV(maxHeightInMeters, distance);
+
+        // FOVをランダムに選択（範囲を持たせる）
+        float randomFOV = Random.Range(minFOV, maxFOV);
+
+        // カメラのFOVを設定
+        shootingCamera.fieldOfView = randomFOV;
+    }
+
 }
