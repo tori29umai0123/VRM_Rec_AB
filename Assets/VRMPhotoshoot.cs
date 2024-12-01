@@ -34,6 +34,7 @@ public class VRMPhotoshoot : MonoBehaviour
     private float radius_body_min = 10f;
     private float radius_body_max = 12f;
     private int shots = 10;
+    private int resolution = 1024;
     private int startPhotoNumber = 1;
     private float waitTime = 0f;
     private bool overwriteExistingFiles = false;
@@ -166,6 +167,10 @@ public class VRMPhotoshoot : MonoBehaviour
                 case "shots":
                     if (int.TryParse(value, out int shotsValue))
                         shots = shotsValue;
+                    break;
+                case "resolution":
+                    if (int.TryParse(value, out int res))
+                        resolution = res;
                     break;
                 case "startPhotoNumber":
                     if (int.TryParse(value, out int startPhotoNum))
@@ -704,13 +709,13 @@ public class VRMPhotoshoot : MonoBehaviour
         RenderTexture currentRT = RenderTexture.active;
         RenderTexture.active = null;
 
-        RenderTexture renderTexture = new RenderTexture(1024, 1024, 24);
+        RenderTexture renderTexture = new RenderTexture(resolution, resolution, 24);
         shootingCamera.targetTexture = renderTexture;
         shootingCamera.Render();
 
         RenderTexture.active = renderTexture;
-        Texture2D screenshot = new Texture2D(1024, 1024, TextureFormat.RGB24, false);
-        screenshot.ReadPixels(new Rect(0, 0, 1024, 1024), 0, 0);
+        Texture2D screenshot = new Texture2D(resolution, resolution, TextureFormat.RGB24, false);
+        screenshot.ReadPixels(new Rect(0, 0, resolution, resolution), 0, 0);
         screenshot.Apply();
 
         RenderTexture.active = currentRT;
@@ -896,13 +901,13 @@ public class VRMPhotoshoot : MonoBehaviour
         RenderTexture currentRT = RenderTexture.active;
         RenderTexture.active = null;
 
-        RenderTexture renderTexture = new RenderTexture(1024, 1024, 24);
+        RenderTexture renderTexture = new RenderTexture(resolution, resolution, 24);
         shootingCamera.targetTexture = renderTexture;
         shootingCamera.Render();
 
         RenderTexture.active = renderTexture;
-        Texture2D screenshot = new Texture2D(1024, 1024, TextureFormat.RGB24, false);
-        screenshot.ReadPixels(new Rect(0, 0, 1024, 1024), 0, 0);
+        Texture2D screenshot = new Texture2D(resolution, resolution, TextureFormat.RGB24, false);
+        screenshot.ReadPixels(new Rect(0, 0, resolution, resolution), 0, 0);
         screenshot.Apply();
 
         byte[] bytes = screenshot.EncodeToPNG();
