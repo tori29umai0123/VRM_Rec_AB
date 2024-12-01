@@ -20,7 +20,7 @@ public class VRMPhotoshoot : MonoBehaviour
     
     // 背景色
     public Color backgroundColorA = Color.white;
-    public Color backgroundColorB = Color.black;
+    public Color backgroundColorB = Color.white;
 
     // FOV調整用のフィールド
     private bool adjustFieldOfView = false; // FOVを調整するかどうか
@@ -515,7 +515,9 @@ public class VRMPhotoshoot : MonoBehaviour
             }
 
             // カメラ距離に基づいてFOVを調整
-            AdjustFieldOfViewBasedOnDistance(Vector3.Distance(cameraSetup.cameraPosition, cameraSetup.targetFocus.position));
+            if (adjustFieldOfView) {
+                AdjustFieldOfViewBasedOnDistance(Vector3.Distance(cameraSetup.cameraPosition, cameraSetup.targetFocus.position));
+            }
 
             await Task.Delay((int)(waitTime * 1000));
 
@@ -609,7 +611,9 @@ public class VRMPhotoshoot : MonoBehaviour
         }
 
         // カメラ距離に基づいてFOVを調整
-        AdjustFieldOfViewBasedOnDistance(Vector3.Distance(cameraSetup.cameraPosition, cameraSetup.targetFocus.position));
+        if (adjustFieldOfView) {
+            AdjustFieldOfViewBasedOnDistance(Vector3.Distance(cameraSetup.cameraPosition, cameraSetup.targetFocus.position));
+        }
 
         await Task.Delay((int)(waitTime * 1000));
 
@@ -1063,8 +1067,6 @@ public class VRMPhotoshoot : MonoBehaviour
 
     private void AdjustFieldOfViewBasedOnDistance(float distance)
     {
-        if (!adjustFieldOfView) return;
-
         // 距離から最小FOVと最大FOVを計算
         float minFOV = CalculateFOV(minHeightInMeters, distance);
         float maxFOV = CalculateFOV(maxHeightInMeters, distance);
